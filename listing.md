@@ -142,27 +142,126 @@ so if you change this, change that too.
 
 ## App Review notes
 
+Expanded after the 1.0 submission drew **Guideline 2.1 — Information Needed**, the routine request
+Apple sends to developer accounts with limited review history. It is not a finding against the app;
+it asks for a screen recording plus five written answers. Apple asked for that information to live
+here permanently, "for reference on future submissions", so this is now the long version rather than
+the two-feature note it started as.
+
+The App Review Notes field caps at **4,000 characters**. What follows is 3,909. The fuller reply
+sent to Resolution Center is below it and does not have to fit.
+
 ```
-No sign-in is required — the app has no accounts, so no demo credentials are needed.
+PURPOSE AND AUDIENCE
+Holy Spirit Prompts is a private journal for Christians who want to write down a spiritual impression when it occurs and look back later to see whether and how it came about. Capture by text, photo, video or voice; tag it; note the scripture it came with; mark it Active, Future, Fulfilled or Discarded. The app then surfaces other entries sharing the same tags or verses, so a connection between entries written years apart is found rather than remembered. A second, simpler section holds "God Stories", short accounts of things that already happened. Single-user by design: no social component, no sharing between users, no community features.
 
-Two features are worth pointing out because they aren't obvious from tapping around:
+NO ACCOUNT, NO PURCHASES, NO SHARED CONTENT
+No sign-in is required and no credentials exist. There are no accounts of any kind, so there is no registration, login or account-deletion flow. There is no in-app purchase and no paid content. Everything a person writes stays on their own device and is never shared with or visible to another user, so there is no user-to-user content and no reporting or blocking mechanism is required.
 
-BACKUP AND RESTORE (Settings tab)
-"Export All Data" writes a single file and hands it to the iOS share sheet. The app makes
-no network request of its own to do this and uploads nothing anywhere. "Restore from Backup"
-reads such a file back; restoring adds by default and never overwrites existing entries.
+ACCESSING THE MAIN FEATURES
+No setup and no sample files are needed. The app opens to the Library tab with everything available.
+- Library: all entries, searchable and filterable. "+" captures a new one.
+- Open an entry: tags and scripture references are chips; tapping one shows every other entry filed under it. "Related Promptings" lists entries sharing its tags or verses.
+- TRANSCRIPTION: open an entry with a voice recording, use the Transcript section, tap "Transcribe Audio". It runs on the device and iOS requires BOTH Siri and Dictation enabled: Settings > Apple Intelligence & Siri, and Settings > General > Keyboard > Enable Dictation. With either off, the app reports it and offers to send that one recording to Apple instead. That dialog is expected behaviour, not a failure.
+- Related tab: browse by tag or by scripture passage.
+- Stories tab: God Stories.
+- Settings: "Export All Data" writes one backup file and hands it to the share sheet, uploading nowhere. "Restore from Backup" reads one back, adding entries and never overwriting. Export first to produce a file to test restore with.
+Camera, microphone, photo library and speech permissions are each requested only on first use of that feature. The app works without granting any.
 
-TRANSCRIPTION (open any prompting with a voice recording, Transcript section)
-Transcription is triggered manually and runs on-device. iOS requires BOTH Siri and Dictation
-to be enabled for on-device recognition:
-  • Siri — Settings > Apple Intelligence & Siri
-  • Dictation — Settings > General > Keyboard > Enable Dictation
-With either disabled, the app reports the error and offers to send that one recording to
-Apple's servers to transcribe instead. That prompt is the expected behaviour, not a failure.
+EXTERNAL SERVICES
+None. No backend, no analytics, no advertising, no authentication provider, no payment processor, no AI service, and zero third-party dependencies or SDKs. Data is stored on the device with SwiftData. The app makes no network requests of its own and contains no networking code.
+Apple frameworks reaching beyond the app's own storage: Photos/PhotoKit (attachments are stored as references to the person's own library, not copies); Speech/SFSpeechRecognizer (on-device by default; a single recording goes to Apple only if the person taps "Send to Apple for Transcription"); CryptoKit and CommonCrypto (only to encrypt an exported backup when a passphrase is chosen).
+
+REGIONAL DIFFERENCES
+None. The app functions consistently in all regions, with no region-gated content, no region-specific service and no geographic restriction. Interface is English only. On-device speech recognition varies by the languages a device supports rather than by region, and where unavailable the same optional fallback above applies.
+
+REGULATED INDUSTRY AND THIRD-PARTY MATERIAL
+Neither applies. The app contains NO Bible text: no translation is bundled, licensed, displayed or retrieved. It recognises the names and standard abbreviations of the books of the Bible ("John", "Jn", "1 Cor") so a reference a person types becomes a link between their own entries, and stores only that reference, being the book name and chapter and verse numbers. Verse content is never stored or shown. Any words beside a reference were written by the person using the app.
 ```
 
-The Siri-and-Dictation note is there because a reviewer with Siri off will hit
-`kLSRErrorDomain` 201 and may read a working feature as broken.
+`3,909 / 4,000 characters`
+
+Four claims in here are load-bearing, and each was checked against the code rather than assumed:
+
+- **No third-party dependencies.** `XCRemoteSwiftPackageReference` appears zero times in
+  `project.pbxproj`. The `dependencies:` entries in `project.yml` are target-to-target.
+- **No networking code.** There is no `URLSession` or equivalent anywhere in the source. The one
+  path off the device is `SFSpeechRecognizer`'s cloud fallback, which Apple's own framework makes.
+- **No Bible text.** `bookAliases` is a list of book *names* and abbreviations;
+  `ScriptureReference` stores `rawText`, `book`, and integers. No translation is bundled, and
+  `Resources/` contains only assets, the Info.plist, the privacy manifest and preview/test seeds.
+  This is the answer to the "protected third-party material" question and it has to stay true — do
+  not bundle verse text without revisiting it.
+- **No user-to-user content.** Nothing a person writes is shared with or visible to anyone else,
+  which is why no reporting or blocking mechanism is required under 1.2.
+
+### The Resolution Center reply
+
+Sent in response to the 2.1 request. Same substance, longer form, and it opens with the screen
+recording since that is what the request leads on.
+
+```
+Thank you for reviewing Holy Spirit Prompts. The requested information follows.
+
+1. SCREEN RECORDING
+
+A screen recording captured on a physical iPhone running the latest iOS is attached. It begins with launching the app and shows the typical user flow.
+
+Regarding the specific flows listed:
+- There is no account registration, login, or account deletion. The app has no accounts of any kind, no sign-in, and no server, so these flows do not exist.
+- There is no user-generated content in the sense the guideline addresses. Everything a person writes is stored only on their own device and is never shared with, visible to, or transmitted to any other user. There is no feed, no social component, and no user-to-user interaction, so no content reporting or blocking mechanism is required.
+- There is no paid content and no in-app purchase. The app is free in full.
+
+2. PURPOSE AND TARGET AUDIENCE
+
+Holy Spirit Prompts is a private journal for Christians who want to write down a spiritual impression at the moment it occurs, and look back later to see whether and how it came about.
+
+The problem it solves: these impressions are fleeting and usually get lost. Kept in a general notes app they become an undifferentiated list, with no way to connect something written today to something written two years ago, and no way to record how it turned out.
+
+The value it provides: capture in whatever form is fastest, by text, photo, video, or voice. Tag it and note the scripture it came with. Mark it Active, Future, Fulfilled or Discarded as the outcome becomes clear. The app then surfaces other entries sharing the same tags or scripture references, so a connection between two entries written years apart is found rather than remembered.
+
+A second, deliberately simpler section holds "God Stories": short written accounts of things that have already happened.
+
+Target audience: individual Christians keeping a personal record. The app is single-user by design, with no social component, no sharing between users, and no community features.
+
+3. SETUP AND ACCESS INSTRUCTIONS
+
+No setup is required and no credentials exist. There is no account, no sign-in, no paywall, and no server. The app opens directly to the Library tab with every feature available immediately. No sample files are needed.
+
+- Library tab: all entries, searchable, filterable by status. The + button opens capture, where you can type a note, add tags, add a scripture reference, attach a photo or video, or record audio.
+- Opening an entry: tags and scripture references appear as chips; tapping one shows every other entry filed under it. The status control sets Active, Future, Fulfilled or Discarded. "Related Promptings" lists other entries sharing its tags or verses.
+- Transcription: open any entry that has a voice recording and use the Transcript section, then "Transcribe Audio". This runs on the device and requires BOTH Siri and Dictation to be enabled on the test device: Siri at Settings > Apple Intelligence & Siri, and Dictation at Settings > General > Keyboard > Enable Dictation. If either is off, the app reports the error and offers to send that one recording to Apple to be transcribed instead. That dialog is expected behaviour, not a failure.
+- Related tab: browse everything filed under a given tag or scripture passage.
+- Stories tab: God Stories, with + to add one.
+- Settings tab: "Export All Data" writes a single backup file and hands it to the iOS share sheet; the app uploads it nowhere. "Restore from Backup" reads such a file back, adding entries and never overwriting existing ones. To test restore, use Export All Data first to produce a file. "Recordings on This Device" lists the audio files the app stores.
+
+Permissions for camera, microphone, photo library, and speech recognition are each requested only when the relevant feature is first used. The app is fully usable without granting any of them.
+
+4. EXTERNAL SERVICES, TOOLS, AND PLATFORMS
+
+The app uses no third-party services of any kind. It has no backend, no analytics, no advertising, no authentication provider, no payment processor, and no AI service. The project has zero third-party dependencies: no Swift packages and no SDKs. All data is stored on the device using SwiftData.
+
+The app makes no network requests of its own and contains no networking code.
+
+The only Apple frameworks it uses that involve anything beyond the app's own storage are:
+- Photos (PhotoKit), for displaying photos and videos the person selects from their own library and saving ones captured in the app back into it. Attachments are stored as references to the person's library rather than copies.
+- Speech (SFSpeechRecognizer), for transcribing voice recordings. This runs on the device by default. If on-device recognition is unavailable, the app shows a dialog and the person may choose "Send to Apple for Transcription", which sends that single recording to Apple's speech recognition service. It is never sent automatically, and nothing else is ever transmitted.
+- CryptoKit and CommonCrypto, used only to encrypt an exported backup file when the person chooses a passphrase.
+
+5. REGIONAL DIFFERENCES
+
+The app functions consistently across all regions. There is no region-gated content, no region-specific service, and no geographic restriction of any feature. The interface is English only.
+
+The one capability that varies is on-device speech recognition, which depends on the languages a given device supports rather than on the person's region. Where it is unavailable, the app offers the same optional, explicitly confirmed fallback described above.
+
+6. REGULATED INDUSTRY AND PROTECTED THIRD-PARTY MATERIAL
+
+The app does not operate in a regulated industry and includes no protected third-party material.
+
+On scripture specifically: the app contains no Bible text. No translation is bundled, licensed, displayed, or retrieved. It recognises the names and standard abbreviations of the books of the Bible, such as "John", "Jn", and "1 Cor", so that a reference a person types can become a link between their own entries. It stores only the reference itself, which is the book name and the chapter and verse numbers. Verse content is never stored or shown. Any words appearing next to a reference were written by the person using the app.
+```
+
+`6,292 characters`
 
 ## Screenshots
 
