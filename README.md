@@ -25,6 +25,7 @@ Once Pages is enabled (see below):
 | Landing | `https://blakecampbell45.github.io/holy-spirit-prompts-site/` |
 | Privacy policy | `https://blakecampbell45.github.io/holy-spirit-prompts-site/privacy.html` |
 | Support | `https://blakecampbell45.github.io/holy-spirit-prompts-site/support.html` |
+| Backup editor | `https://blakecampbell45.github.io/holy-spirit-prompts-site/editor/` |
 
 These are the URLs that go into App Store Connect. They can be changed later without submitting a
 new build, so a typo here is cheap to fix — but a URL that 404s during review is a rejection, so
@@ -53,9 +54,10 @@ and Pages serves them as-is.
 | `index.html` | Landing page. Describes the app and links to the other two. Doubles as the App Store marketing URL. |
 | `privacy.html` | The privacy policy. **Required** by the App Store. |
 | `support.html` | Support page: contact address plus the questions users actually hit. **Required** by the App Store. |
+| `editor/index.html` | The backup editor: opens an exported backup in the browser, edits it, and writes it out again. **A copy** — see below. |
 | `listing.md` | Everything pasted into App Store Connect — name, subtitle, keywords, description, categories, review notes, screenshot specs. Not published; it's a reference. |
 
-Each HTML file is self-contained: its own CSS inline, no external fonts, no JavaScript, no network
+Each of the three pages is self-contained: its own CSS inline, no external fonts, no JavaScript, no network
 requests. They render correctly in light and dark mode and on a phone. That's deliberate — a
 privacy policy that depends on a CDN is a privacy policy that can break or quietly phone home.
 
@@ -102,3 +104,24 @@ privacy manifest is both a review rejection and a false statement made in your n
 
 Both `privacy.html` and `support.html` carry a "Last updated" line. Change it when you change the
 content — it's the only signal a reader has that the document is current.
+
+## The backup editor is a copy
+
+`editor/index.html` is copied from `Web/index.html` in the app repo, which is where it is written
+and tested — that repo's round-trip harness checks it against the app's own encoder, and nothing
+here does. Don't edit it here. After it changes there, copy it across and commit:
+
+```
+cp ../HolySpiritApp/Web/index.html editor/index.html
+```
+
+**It only works with an app build that has the "Add and Apply Edits" restore.** The other two
+restore options skip anything already on the phone, so on an older build every edit is dropped
+with the restore reporting success. Don't publish it ahead of the release that carries that
+option, and copy it across whenever the backup format changes.
+
+Unlike the other pages it does run JavaScript — it has to, to read and write a backup. Its own
+`Content-Security-Policy` sets `connect-src 'none'` and `default-src 'none'`, so it still makes no
+network requests and loads nothing from elsewhere; the privacy policy's section on it relies on
+that.
+
