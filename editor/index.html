@@ -1,0 +1,2121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  The page makes one promise — that a backup opened here never leaves the browser — and this
+  header is what makes it enforceable rather than a claim. `connect-src 'none'` means no fetch,
+  no XHR, no WebSocket, no beacon: there is nowhere for the file to go. `default-src 'none'`
+  blocks every external script, style, font and image, which is also why this file carries no
+  CDN link and no web font; a page that reaches out to a font host on open would already have
+  told someone that it was opened.
+
+  Keep it that way. Adding an analytics snippet, a font, or an "upload to check" button means
+  rewriting this line, and the iOS app's own About text ("the only things that ever leave it are
+  a backup you export yourself, and a recording you choose to send to Apple") stops being true.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>Holy Spirit Prompts — Backup Editor</title>
+<style>
+/* ---------------------------------------------------------------------------
+   A reading desk, not a dashboard.
+
+   The content here is somebody's record of what they believe God said to them,
+   so it is set like a page of a book: a warm paper ground, a humanist serif at
+   a readable measure, hairline rules instead of cards and shadows, and one
+   accent — the red of printed liturgy, which is where the word "rubric" comes
+   from. It is used for scripture references and for nothing decorative.
+
+   Every font is one the operating system already has. That is not a shortcut:
+   a web font means a request to a font host the moment the page opens, which
+   would contradict the Content-Security-Policy above.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --paper:        #f2eee5;
+  --paper-raised: #fbf8f2;
+  --paper-sunk:   #eae5d9;
+  --rule:         #ded7c9;
+  --rule-strong:  #bdb4a2;
+  --ink:          #1e1a15;
+  --ink-soft:     #5a5146;
+  --ink-faint:    #8a8073;
+  --rubric:       #9b2c20;
+  /* The text that sits *on* the accent, as a token rather than a literal: the accent is a deep
+     red in light and a light salmon in dark, so a fixed near-white reads correctly on one and
+     barely at all on the other. */
+  --on-rubric:    #fdf8f2;
+  --moss:         #4d6246;
+  --slate:        #3f5566;
+  --faded:        #9a9388;
+
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, "Times New Roman", serif;
+  --sans: "Avenir Next", Avenir, "Nimbus Sans", "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  --rail: 17.5rem;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:        #17150f;
+    --paper-raised: #1f1c16;
+    --paper-sunk:   #110f0b;
+    --rule:         #332e26;
+    --rule-strong:  #4d4639;
+    --ink:          #ece5d8;
+    --ink-soft:     #a79e8e;
+    --ink-faint:    #7a7161;
+    --rubric:       #dd7a66;
+    --on-rubric:    #1a1510;
+    --moss:         #94b188;
+    --slate:        #8cabc3;
+    --faded:        #6b6456;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* An author `display` beats the UA stylesheet's `[hidden] { display: none }`, and both of the
+   two screens here set one — so `hidden` on them did nothing at all and the opening screen sat
+   on top of the library it was meant to have been replaced by. The DOM read correctly the whole
+   time, which is why only looking at the page caught it. */
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Paper tooth. Deliberately almost invisible — it should read as a surface, not a texture. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: .035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-color-scheme: dark) { body::before { opacity: .05; } }
+
+/* --- shared type ------------------------------------------------------- */
+
+.eyebrow {
+  font-size: .6875rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+
+.serif { font-family: var(--serif); }
+
+h1, h2, h3 { font-weight: 500; margin: 0; }
+
+a { color: var(--rubric); }
+
+:focus-visible {
+  outline: 2px solid var(--rubric);
+  outline-offset: 2px;
+  border-radius: 1px;
+}
+
+/* --- controls ---------------------------------------------------------- */
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.btn {
+  font-size: .75rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: .55em 1.1em;
+  border: 1px solid var(--rule-strong);
+  background: var(--paper-raised);
+  color: var(--ink);
+  transition: background .15s, border-color .15s, color .15s;
+}
+.btn:hover { border-color: var(--ink); }
+.btn:disabled { opacity: .4; cursor: default; border-color: var(--rule); }
+.btn:disabled:hover { border-color: var(--rule); }
+
+.btn-primary {
+  background: var(--rubric);
+  border-color: var(--rubric);
+  color: var(--on-rubric);
+}
+/* Ink on paper, both ways round — the pair inverts with the theme, so one rule covers both. */
+.btn-primary:hover { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.btn-primary:disabled { background: var(--paper-sunk); border-color: var(--rule); color: var(--ink-faint); }
+
+.btn-quiet {
+  border-color: transparent;
+  background: none;
+  color: var(--ink-soft);
+}
+.btn-quiet:hover { color: var(--ink); border-color: var(--rule); }
+
+input[type="text"], input[type="search"], input[type="date"],
+input[type="datetime-local"], input[type="password"], textarea, select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  padding: .5em .65em;
+  width: 100%;
+  border-radius: 0;
+}
+textarea { resize: vertical; }
+input:hover, textarea:hover, select:hover { border-color: var(--rule-strong); }
+
+label { display: block; }
+
+.field { margin-bottom: 1.25rem; }
+.field > .eyebrow { margin-bottom: .4rem; }
+
+/* --- the rail ---------------------------------------------------------- */
+
+.shell { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); min-height: 100vh; }
+
+.rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 2rem 1.5rem;
+  border-right: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.mark { line-height: 1.25; }
+.mark .dove { color: var(--rubric); font-size: 1.5rem; display: block; margin-bottom: .35rem; }
+.mark strong { display: block; font-family: var(--serif); font-size: 1.1875rem; font-weight: 500; letter-spacing: -.005em; }
+.mark span { color: var(--ink-faint); font-size: .8125rem; }
+
+.filecard {
+  border: 1px solid var(--rule);
+  background: var(--paper-raised);
+  padding: .85rem;
+}
+.filecard .name {
+  font-family: var(--mono);
+  font-size: .75rem;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.filecard .meta { color: var(--ink-faint); font-size: .75rem; margin-top: .4rem; }
+.filecard .locked { color: var(--rubric); }
+
+nav ul { list-style: none; margin: 0; padding: 0; }
+nav li + li { margin-top: 1px; }
+nav button {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .5rem;
+  width: 100%;
+  padding: .5rem .6rem;
+  text-align: left;
+  border-left: 2px solid transparent;
+  color: var(--ink-soft);
+  transition: color .15s, background .15s;
+}
+nav button:hover { color: var(--ink); background: var(--paper-raised); }
+nav button[aria-current="true"] {
+  color: var(--ink);
+  border-left-color: var(--rubric);
+  background: var(--paper-raised);
+}
+nav .count { font-family: var(--mono); font-size: .75rem; color: var(--ink-faint); }
+
+.rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: .75rem; }
+
+.changes {
+  font-size: .8125rem;
+  color: var(--ink-soft);
+  border-top: 1px solid var(--rule);
+  padding-top: .75rem;
+}
+.changes b { color: var(--rubric); font-variant-numeric: tabular-nums; }
+
+/* --- main -------------------------------------------------------------- */
+
+main { padding: 2.75rem 3rem 6rem; max-width: 60rem; }
+
+.head { margin-bottom: 2.25rem; }
+.head h2 { font-family: var(--serif); font-size: 2rem; letter-spacing: -.015em; margin-bottom: .35rem; }
+.head p { margin: 0; color: var(--ink-soft); max-width: 46ch; }
+
+.toolbar { display: flex; gap: .75rem; align-items: center; margin-bottom: 1.75rem; flex-wrap: wrap; }
+.toolbar input[type="search"] { max-width: 20rem; }
+
+/* --- the opening state ------------------------------------------------- */
+
+.welcome {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+.welcome-inner { max-width: 34rem; }
+.welcome .dove { color: var(--rubric); font-size: 2.5rem; }
+.welcome h1 {
+  font-family: var(--serif);
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  letter-spacing: -.02em;
+  margin: 1rem 0 .75rem;
+  text-wrap: balance;
+}
+.welcome p { color: var(--ink-soft); margin: 0 auto 2rem; max-width: 40ch; }
+
+.drop {
+  border: 1px solid var(--rule-strong);
+  background: var(--paper-raised);
+  padding: 2.5rem 2rem;
+  transition: border-color .18s, background .18s;
+}
+.drop.over { border-color: var(--rubric); background: var(--paper-sunk); }
+.drop .hint { color: var(--ink-faint); font-size: .8125rem; margin: 1rem 0 0; }
+
+.assurance {
+  margin-top: 2.5rem;
+  text-align: left;
+  font-size: .8125rem;
+  color: var(--ink-soft);
+  border-top: 1px solid var(--rule);
+  padding-top: 1.25rem;
+  display: grid;
+  gap: .7rem;
+}
+.assurance div { display: grid; grid-template-columns: 1.25rem 1fr; gap: .5rem; }
+.assurance .tick { color: var(--rubric); }
+
+/* --- entries ----------------------------------------------------------- */
+
+.entries { border-top: 1px solid var(--rule); }
+
+.entry { border-bottom: 1px solid var(--rule); }
+
+.entry-open { background: var(--paper-raised); }
+
+.entry-head {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 1.35rem .25rem;
+  position: relative;
+}
+.entry-head:hover .note { color: var(--rubric); }
+
+.entry-meta {
+  display: flex;
+  align-items: baseline;
+  gap: .6rem;
+  flex-wrap: wrap;
+  margin-bottom: .5rem;
+}
+.entry-meta time { font-family: var(--mono); font-size: .75rem; color: var(--ink-faint); letter-spacing: .02em; }
+
+.status {
+  font-size: .6875rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: .4em;
+}
+.status::before { content: "●"; font-size: .6em; }
+.status-active    { color: var(--rubric); }
+.status-future    { color: var(--slate); }
+.status-fulfilled { color: var(--moss); }
+.status-discarded { color: var(--faded); }
+
+.edited-mark {
+  font-size: .6875rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--rubric);
+  border: 1px solid currentColor;
+  padding: .1em .45em;
+}
+
+.note {
+  font-family: var(--serif);
+  font-size: 1.1875rem;
+  line-height: 1.55;
+  color: var(--ink);
+  transition: color .15s;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.note.empty { color: var(--ink-faint); font-style: italic; }
+
+.entry-tail { display: flex; gap: 1rem; flex-wrap: wrap; align-items: baseline; margin-top: .65rem; }
+
+.verse {
+  font-family: var(--serif);
+  color: var(--rubric);
+  font-size: .9375rem;
+}
+.verse + .verse::before { content: "·"; margin: 0 .4rem; color: var(--rule-strong); }
+
+.chip {
+  font-size: .75rem;
+  color: var(--ink-soft);
+  border: 1px solid var(--rule-strong);
+  padding: .15em .6em;
+  display: inline-flex;
+  align-items: center;
+  gap: .4em;
+  background: var(--paper);
+}
+.chips { display: flex; gap: .4rem; flex-wrap: wrap; }
+.chip button { color: var(--ink-faint); font-size: 1rem; line-height: 1; }
+.chip button:hover { color: var(--rubric); }
+
+.aside { font-family: var(--mono); font-size: .75rem; color: var(--ink-faint); }
+
+/* --- the editor -------------------------------------------------------- */
+
+.editor { padding: 0 .25rem 1.75rem; display: grid; gap: 1.5rem; }
+.editor .row { display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
+
+.editor textarea.note-input {
+  font-family: var(--serif);
+  font-size: 1.1875rem;
+  line-height: 1.55;
+  min-height: 7rem;
+}
+
+.segmented { display: flex; border: 1px solid var(--rule); background: var(--paper); }
+.segmented label {
+  flex: 1;
+  text-align: center;
+  padding: .5em .25em;
+  font-size: .6875rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-faint);
+  cursor: pointer;
+  border-right: 1px solid var(--rule);
+  transition: background .15s, color .15s;
+}
+.segmented label:last-child { border-right: 0; }
+.segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.segmented label:hover { color: var(--ink); }
+.segmented input:checked + span { color: var(--ink); }
+.segmented label:has(input:checked) { background: var(--paper-sunk); color: var(--ink); }
+.segmented label:has(input:focus-visible) { outline: 2px solid var(--rubric); outline-offset: -2px; }
+
+.counter { font-family: var(--mono); font-size: .75rem; color: var(--ink-faint); text-align: right; margin-top: .3rem; }
+.counter.full { color: var(--rubric); }
+
+.readonly {
+  border-left: 2px solid var(--rule-strong);
+  padding: .1rem 0 .1rem 1rem;
+  display: grid;
+  gap: .5rem;
+}
+.readonly .why { font-size: .8125rem; color: var(--ink-faint); max-width: 54ch; }
+
+.media-row { display: flex; align-items: center; gap: .85rem; flex-wrap: wrap; }
+/* Narrowed so the Save beside it stays on the same line. A native audio control is ~300px by
+   default, which alone fills the column it shares. */
+.media-row audio { height: 2rem; width: 13rem; }
+.media-row img { max-height: 5rem; border: 1px solid var(--rule); }
+
+.editor-foot { display: flex; gap: .75rem; align-items: center; border-top: 1px solid var(--rule); padding-top: 1.1rem; }
+.editor-foot .spacer { flex: 1; }
+
+/* --- tables (tags, recordings) ----------------------------------------- */
+
+/* Fixed layout so a long claim can be truncated rather than squeezing the controls beside it
+   into a column too narrow to hold them on one line. Column widths are set per table below. */
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th {
+  text-align: left;
+  font-size: .6875rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+  padding: 0 .75rem .6rem 0;
+  border-bottom: 1px solid var(--rule-strong);
+}
+td { padding: .8rem .75rem .8rem 0; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+td.wrap { overflow-wrap: anywhere; }
+td.clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+td.actions { white-space: nowrap; }
+tr:hover td { background: var(--paper-raised); }
+
+.flag {
+  font-size: .6875rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.flag-orphan { color: var(--rubric); }
+.flag-missing { color: var(--rubric); }
+.flag-ok { color: var(--ink-faint); }
+
+/* --- notices ----------------------------------------------------------- */
+
+.notice {
+  border: 1px solid var(--rule-strong);
+  border-left-width: 2px;
+  border-left-color: var(--rubric);
+  background: var(--paper-raised);
+  padding: 1rem 1.15rem;
+  font-size: .875rem;
+  color: var(--ink-soft);
+  margin-bottom: 2rem;
+  max-width: 54ch;
+}
+.notice strong { color: var(--ink); font-weight: 600; }
+
+.empty-state { color: var(--ink-faint); font-family: var(--serif); font-size: 1.125rem; padding: 3rem 0; }
+
+/* --- dialogs ----------------------------------------------------------- */
+
+dialog {
+  border: 1px solid var(--rule-strong);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 2rem;
+  max-width: 30rem;
+  width: calc(100% - 3rem);
+  box-shadow: 0 2rem 4rem rgba(0,0,0,.28);
+}
+dialog::backdrop { background: rgba(20, 17, 12, .5); }
+dialog h3 { font-family: var(--serif); font-size: 1.375rem; margin-bottom: .6rem; }
+dialog p { color: var(--ink-soft); font-size: .875rem; margin: 0 0 1.25rem; }
+dialog .actions { display: flex; gap: .75rem; justify-content: flex-end; margin-top: 1.5rem; }
+dialog .error { color: var(--rubric); font-size: .8125rem; min-height: 1.2em; margin: .5rem 0 0; }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 2rem;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--paper);
+  padding: .8rem 1.4rem;
+  font-size: .875rem;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s, transform .2s;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(-.35rem); }
+
+/* --- entrance ---------------------------------------------------------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .stagger > * {
+    animation: rise .5s cubic-bezier(.2,.7,.3,1) both;
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(.6rem); }
+    to   { opacity: 1; transform: none; }
+  }
+}
+
+/* --- narrow ------------------------------------------------------------ */
+
+@media (max-width: 52rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.25rem;
+  }
+  .rail-foot { margin-top: 0; }
+  nav ul { display: flex; flex-wrap: wrap; gap: .25rem; }
+  nav button { border-left: 0; border-bottom: 2px solid transparent; padding: .4rem .6rem; }
+  nav button[aria-current="true"] { border-left-color: transparent; border-bottom-color: var(--rubric); }
+  main { padding: 2rem 1.25rem 5rem; }
+  .head h2 { font-size: 1.625rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- The opening screen. Replaced wholesale once a backup is open. -->
+<section class="welcome" id="welcome">
+  <div class="welcome-inner stagger">
+    <div>
+      <span class="dove" aria-hidden="true">✣</span>
+      <h1>Your backup, on a bigger screen</h1>
+      <p>Open a Holy&nbsp;Spirit&nbsp;Prompts backup to read it, tidy it up with a keyboard, and export it again.</p>
+    </div>
+
+    <div class="drop" id="drop">
+      <button class="btn btn-primary" id="pick">Choose a backup file</button>
+      <input type="file" id="file" accept=".hsprompts,.hspromptsenc,application/octet-stream" hidden>
+      <p class="hint">or drop it here — <code>.hsprompts</code> or <code>.hspromptsenc</code></p>
+    </div>
+
+    <div class="assurance">
+      <div><span class="tick" aria-hidden="true">✣</span><span><strong>Nothing is uploaded.</strong> There is no account and no server. Your backup is opened by this page in your own browser and never sent anywhere — the page has no way to send it.</span></div>
+      <div><span class="tick" aria-hidden="true">✣</span><span><strong>Nothing is kept.</strong> Close the tab and it is gone. Your edits live in this tab until you export them.</span></div>
+      <div><span class="tick" aria-hidden="true">✣</span><span><strong>Save the page if you like.</strong> It is a single file with no dependencies, so it works offline once saved.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- The library. Hidden until a file is open. -->
+<div class="shell" id="shell" hidden>
+  <aside class="rail">
+    <div class="mark">
+      <span class="dove" aria-hidden="true">✣</span>
+      <strong>Backup Editor</strong>
+      <span>Holy Spirit Prompts</span>
+    </div>
+
+    <div class="filecard">
+      <div class="name" id="file-name"></div>
+      <div class="meta" id="file-meta"></div>
+    </div>
+
+    <nav aria-label="Sections">
+      <ul id="nav"></ul>
+    </nav>
+
+    <div class="rail-foot">
+      <div class="changes" id="changes"></div>
+      <button class="btn btn-primary" id="export">Export</button>
+      <button class="btn btn-quiet" id="close">Close without exporting</button>
+    </div>
+  </aside>
+
+  <main id="main"></main>
+</div>
+
+<dialog id="passphrase-dialog">
+  <h3>This backup is encrypted</h3>
+  <p>Enter the passphrase you chose when you exported it. It is used here in your browser and never sent anywhere.</p>
+  <label class="eyebrow" for="passphrase-input">Passphrase</label>
+  <input type="password" id="passphrase-input" autocomplete="current-password">
+  <p class="error" id="passphrase-error" role="alert"></p>
+  <div class="actions">
+    <button class="btn btn-quiet" id="passphrase-cancel">Cancel</button>
+    <button class="btn btn-primary" id="passphrase-ok">Open</button>
+  </div>
+</dialog>
+
+<dialog id="export-dialog">
+  <h3>Export this backup</h3>
+  <p id="export-summary"></p>
+  <div class="field">
+    <span class="eyebrow">Protect with a passphrase</span>
+    <label style="display:flex;gap:.5rem;align-items:flex-start;margin-top:.4rem;font-size:.875rem;color:var(--ink-soft)">
+      <input type="checkbox" id="export-encrypt" style="width:auto;margin-top:.25rem">
+      <span>Encrypt the file. Choose this if it is going anywhere you don't control — a shared drive, an email to yourself.</span>
+    </label>
+  </div>
+  <div class="field" id="export-passphrase-field" hidden>
+    <label class="eyebrow" for="export-passphrase">Passphrase</label>
+    <input type="password" id="export-passphrase" autocomplete="new-password">
+    <label class="eyebrow" for="export-passphrase-confirm" style="margin-top:.75rem">Confirm</label>
+    <input type="password" id="export-passphrase-confirm" autocomplete="new-password">
+    <p class="error" id="export-error" role="alert"></p>
+    <p style="font-size:.8125rem;color:var(--ink-faint);margin:.6rem 0 0">There is no way to recover this file if you forget it.</p>
+  </div>
+  <div class="actions">
+    <button class="btn btn-quiet" id="export-cancel">Cancel</button>
+    <button class="btn btn-primary" id="export-go">Export</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+"use strict";
+
+/* ===========================================================================
+   The format
+   ---------------------------------------------------------------------------
+   A second implementation of the container that `BackupArchive.swift` writes,
+   which means two codecs now exist for one file format and nothing in a normal
+   build compares them. `Web/Tests/roundtrip.mjs` and `WebFixtureTests.swift`
+   are what hold them together; read the notes in both before changing anything
+   here.
+
+   Three things in here are not obvious and all three have teeth:
+
+   1. Dates are ISO-8601 with NO fractional seconds. Swift encodes with
+      `.iso8601`, whose internet-date-time form stops at whole seconds, and
+      `JSONDecoder`'s matching strategy refuses to parse anything finer. So a
+      plain `toISOString()` — which always emits `.000` — produces a file the
+      app rejects at `decode` and reports as *damaged*, pointing the user at
+      corruption rather than at the real cause. `swiftISO` is the only thing
+      that should ever write a date into a manifest.
+
+   2. The manifest length is in BYTES, not characters. One emoji in a note and
+      a length taken from `String.length` leaves every blob reading from the
+      wrong offset.
+
+   3. Absent optionals are omitted, not null. Swift's synthesized encoders use
+      `encodeIfPresent`, so `fulfilledNote: null` is not what an unfulfilled
+      prompting looks like coming out of the app. `canonicalJSON` drops them,
+      which is also what makes an unedited round trip through this page come
+      back as the same bytes it went in as.
+   =========================================================================== */
+
+const HSPFormat = (() => {
+  const MAGIC = "HSPB";
+  const ENC_MAGIC = "HSPE";
+  const CURRENT_VERSION = 1;
+  const SALT_BYTES = 16;
+  const IV_BYTES = 12;
+  // Matches `BackupCrypto.defaultIterations`. The count travels in the file, so a backup written
+  // by an older build still opens — only new files written here use this number.
+  const DEFAULT_ITERATIONS = 210000;
+
+  const utf8 = new TextEncoder();
+  const ascii = (s) => Uint8Array.from(s, (c) => c.charCodeAt(0));
+
+  class BackupError extends Error {}
+
+  /** An ISO-8601 instant in the only shape the app's decoder accepts. */
+  function swiftISO(date) {
+    return date.toISOString().replace(/\.\d{3}Z$/, "Z");
+  }
+
+  /**
+   * JSON with object keys sorted and null/undefined members dropped, matching
+   * `JSONEncoder` with `.sortedKeys` and the omit-nil behaviour of a synthesized encoder.
+   *
+   * Sorting is for diffability rather than correctness — nothing decoding this cares about key
+   * order — but it is what lets two exports of an unchanged library be compared as files, which
+   * is the property `buildManifest` sorts its own arrays to preserve.
+   */
+  function canonicalJSON(value) {
+    if (Array.isArray(value)) return "[" + value.map(canonicalJSON).join(",") + "]";
+    if (value && typeof value === "object") {
+      const parts = [];
+      for (const key of Object.keys(value).sort()) {
+        const member = value[key];
+        if (member === null || member === undefined) continue;
+        parts.push(jsonString(key) + ":" + canonicalJSON(member));
+      }
+      return "{" + parts.join(",") + "}";
+    }
+    return typeof value === "string" ? jsonString(value) : JSON.stringify(value);
+  }
+
+  /**
+   * A JSON string literal with forward slashes escaped, which `JSON.stringify` does not do and
+   * `JSONEncoder` does — `withoutEscapingSlashes` exists as an opt-*out* precisely because
+   * escaping is Foundation's default, and the app doesn't opt out.
+   *
+   * Nothing decoding either form can tell them apart, so this buys one thing: a library opened
+   * and exported again untouched comes back as the *same bytes*. That is worth having. Without it
+   * every pass through this page rewrites a file that hasn't changed — four bytes different for
+   * every `PHAsset` identifier, which all contain slashes — and anyone comparing two backups has
+   * no way to tell a real edit from a trip through the browser. `roundtrip.mjs` pins it.
+   *
+   * Safe as a blanket replacement: inside a JSON string literal a `/` is only ever a literal
+   * slash, never part of an escape sequence.
+   */
+  function jsonString(text) {
+    return JSON.stringify(text).replace(/\//g, "\\/");
+  }
+
+  function reader(bytes) {
+    let cursor = 0;
+    return {
+      take(count) {
+        if (count < 0 || cursor + count > bytes.length) {
+          throw new BackupError("That backup file is incomplete — it may not have finished downloading.");
+        }
+        const slice = bytes.subarray(cursor, cursor + count);
+        cursor += count;
+        return slice;
+      },
+      rest() { return bytes.subarray(cursor); },
+      at() { return cursor; },
+    };
+  }
+
+  const matches = (bytes, text) =>
+    bytes.length >= text.length &&
+    text.split("").every((c, i) => bytes[i] === c.charCodeAt(0));
+
+  const u32 = (b) => new DataView(b.buffer, b.byteOffset, 4).getUint32(0, true);
+  const u64 = (b) => new DataView(b.buffer, b.byteOffset, 8).getBigUint64(0, true);
+
+  function isEncrypted(bytes) { return matches(bytes, ENC_MAGIC); }
+
+  /** `HSPB` + version + manifest length + manifest JSON + the blobs back to back. */
+  function readContainer(bytes) {
+    const read = reader(bytes);
+    if (!matches(read.take(MAGIC.length), MAGIC)) {
+      throw new BackupError("That file isn't a Holy Spirit Prompts backup.");
+    }
+
+    const version = u32(read.take(4));
+    if (version > CURRENT_VERSION) {
+      throw new BackupError(
+        `That backup was made by a newer version of the app (format ${version}). ` +
+        "This page can't read it yet."
+      );
+    }
+
+    // The same range check `decode` makes in Swift, where `Int(someUInt64)` traps rather than
+    // throwing. Here an absurd length would simply allocate nothing and read past the end, so
+    // it's caught for the same reason: a backup is exactly the input that arrives truncated.
+    const declared = u64(read.take(8));
+    if (declared > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new BackupError("That backup file is damaged and can't be read.");
+    }
+
+    let manifest;
+    try {
+      manifest = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(read.take(Number(declared))));
+    } catch {
+      throw new BackupError("That backup file is damaged and can't be read.");
+    }
+
+    const blobs = new Map();
+    for (const file of manifest.mediaFiles ?? []) {
+      blobs.set(file.filename, read.take(file.byteCount));
+    }
+    return { version, manifest, blobs };
+  }
+
+  function writeContainer(manifest, blobs) {
+    const files = manifest.mediaFiles ?? [];
+    for (const file of files) {
+      if (!blobs.has(file.filename)) {
+        throw new BackupError(`A recording referenced by this backup is missing (${file.filename}).`);
+      }
+      // Taken from the bytes rather than trusted from the record, so the container can't be
+      // written inconsistent with itself even if something upstream got the count wrong.
+      file.byteCount = blobs.get(file.filename).length;
+    }
+
+    const json = utf8.encode(canonicalJSON(manifest));
+    const total = MAGIC.length + 4 + 8 + json.length +
+      files.reduce((sum, f) => sum + blobs.get(f.filename).length, 0);
+
+    const out = new Uint8Array(total);
+    const view = new DataView(out.buffer);
+    let at = 0;
+    out.set(ascii(MAGIC), at); at += MAGIC.length;
+    view.setUint32(at, manifest.version ?? CURRENT_VERSION, true); at += 4;
+    view.setBigUint64(at, BigInt(json.length), true); at += 8;
+    out.set(json, at); at += json.length;
+    for (const file of files) {
+      const blob = blobs.get(file.filename);
+      out.set(blob, at);
+      at += blob.length;
+    }
+    return out;
+  }
+
+  async function deriveKey(passphrase, salt, iterations) {
+    const base = await crypto.subtle.importKey("raw", utf8.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+      base,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+
+  /**
+   * `HSPE` + iterations + salt + nonce + ciphertext + tag.
+   *
+   * CryptoKit's `SealedBox.combined` is nonce ‖ ciphertext ‖ tag, while WebCrypto returns only
+   * ciphertext ‖ tag — so the nonce is prepended by hand here and split off again on the way in.
+   * Getting that wrong fails as a wrong-passphrase error, which is the most misleading possible
+   * symptom; it is the first thing to check if an encrypted round trip ever breaks.
+   */
+  async function encryptArchive(plaintext, passphrase, iterations = DEFAULT_ITERATIONS) {
+    const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+    const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+    const key = await deriveKey(passphrase, salt, iterations);
+    const sealed = new Uint8Array(
+      await crypto.subtle.encrypt({ name: "AES-GCM", iv, tagLength: 128 }, key, plaintext)
+    );
+
+    const out = new Uint8Array(ENC_MAGIC.length + 4 + SALT_BYTES + IV_BYTES + sealed.length);
+    let at = 0;
+    out.set(ascii(ENC_MAGIC), at); at += ENC_MAGIC.length;
+    new DataView(out.buffer).setUint32(at, iterations, true); at += 4;
+    out.set(salt, at); at += SALT_BYTES;
+    out.set(iv, at); at += IV_BYTES;
+    out.set(sealed, at);
+    return out;
+  }
+
+  async function decryptArchive(bytes, passphrase) {
+    const read = reader(bytes);
+    if (!matches(read.take(ENC_MAGIC.length), ENC_MAGIC)) {
+      throw new BackupError("That file isn't a Holy Spirit Prompts backup.");
+    }
+    const iterations = u32(read.take(4));
+    if (iterations === 0) throw new BackupError("That backup file is damaged and can't be read.");
+
+    const salt = read.take(SALT_BYTES);
+    const iv = read.take(IV_BYTES);
+    const key = await deriveKey(passphrase, salt, iterations);
+    try {
+      return new Uint8Array(
+        await crypto.subtle.decrypt({ name: "AES-GCM", iv, tagLength: 128 }, key, read.rest())
+      );
+    } catch {
+      // AES-GCM can't tell a wrong key from altered ciphertext, and shouldn't try — both mean the
+      // same thing to whoever is holding the file.
+      throw new BackupError("Wrong passphrase, or the file has been altered since it was exported.");
+    }
+  }
+
+  return {
+    BackupError, CURRENT_VERSION, DEFAULT_ITERATIONS,
+    swiftISO, canonicalJSON, isEncrypted, readContainer, writeContainer,
+    encryptArchive, decryptArchive,
+  };
+})();
+
+/* ===========================================================================
+   What this page is allowed to change
+   ---------------------------------------------------------------------------
+   Only what `BackupService.RestoreMode.merge` will actually apply. That mode
+   writes a record's scalar fields and its tag links, and deliberately leaves
+   every cascade-owned child alone — verses, attachments, and the audio files
+   behind them.
+
+   So verses and attachments are shown here and cannot be edited. Offering a
+   field whose edits are silently dropped on the way back onto the phone would
+   be worse than not offering it at all: the export succeeds, the restore
+   reports success, and the change is gone with nothing to point at.
+
+   Deletion is the other thing missing, for a reason that isn't a limitation of
+   this page: a record absent from a backup is indistinguishable from one the
+   backup never carried, so a merge cannot express it. Removing something stays
+   a job for the app, or for a full Replace restore.
+   =========================================================================== */
+
+// A whitelist rather than a blocklist, so a field added to the manifest later is read-only here
+// until someone decides otherwise. A story's two editable fields are handled by name in the input
+// listener, because both need normalising on the way in — the cap and the start-of-day.
+const EDITABLE_PROMPTING_FIELDS =
+  ["date", "textNote", "transcript", "status", "fulfilledDate", "fulfilledNote", "tagIDs"];
+
+const STORY_MAX_LENGTH = 255;          // GodStory.maxTextLength
+const STATUSES = ["active", "future", "fulfilled", "discarded"];
+
+/**
+ * Every "now" on the page goes through here, so the test harness can pin it with
+ * `HSP.pinClock` and write the same fixture bytes on every run. Unpinned in normal use.
+ */
+let pinnedTime = null;
+const now = () => (pinnedTime === null ? new Date() : new Date(pinnedTime));
+
+const state = {
+  fileName: null,
+  arrivedEncrypted: false,
+  manifest: null,
+  pristine: null,          // a deep copy taken at load, so a single entry can be reverted
+  blobs: new Map(),
+  view: "promptings",
+  query: "",
+  open: null,              // one expanded editor at a time — see the note on renderList
+  edited: new Set(),
+  created: new Set(),
+  renamedTags: new Set(),
+  createdTags: new Set(),
+};
+
+/* --- little helpers ----------------------------------------------------- */
+
+const $ = (selector) => document.querySelector(selector);
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => (
+  { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+));
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+
+const promptings = () => state.manifest?.promptings ?? [];
+const stories = () => state.manifest?.stories ?? [];
+const tags = () => state.manifest?.tags ?? [];
+const tagsByID = () => new Map(tags().map((t) => [t.id, t]));
+
+let toastTimer;
+function toast(message) {
+  const node = $("#toast");
+  node.textContent = message;
+  node.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => node.classList.remove("show"), 3200);
+}
+
+/* Object URLs are minted per render and revoked on the next one, so a long session browsing
+   recordings doesn't accumulate every blob it has ever shown. */
+let liveURLs = [];
+function blobURL(bytes, type) {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  liveURLs.push(url);
+  return url;
+}
+function revokeURLs() {
+  liveURLs.forEach(URL.revokeObjectURL);
+  liveURLs = [];
+}
+
+/* --- dates -------------------------------------------------------------- */
+
+const pad = (n) => String(n).padStart(2, "0");
+
+/** `YYYY-MM-DDTHH:MM` in local time, for `<input type="datetime-local">`. */
+function toLocalMoment(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** `YYYY-MM-DD` in local time, for `<input type="date">`. */
+function toLocalDay(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * A story's date is a day, not a moment — `GodStory.day` stores local midnight — so this builds
+ * the instant from the parts rather than letting `new Date("2026-10-15")` parse it, which would
+ * read it as UTC midnight and land the story on the previous day for anyone west of London.
+ */
+function fromLocalDay(value) {
+  const [y, m, d] = value.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+const dayFormat = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
+const momentFormat = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+
+const readableDay = (iso) => dayFormat.format(new Date(iso));
+const readableMoment = (iso) => momentFormat.format(new Date(iso));
+
+function readableBytes(count) {
+  if (count < 1024) return `${count} B`;
+  if (count < 1024 * 1024) return `${(count / 1024).toFixed(0)} KB`;
+  return `${(count / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readableDuration(seconds) {
+  if (seconds == null) return null;
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)}:${pad(whole % 60)}`;
+}
+
+/* --- verse rendering ---------------------------------------------------- */
+
+/**
+ * The same shape `ScriptureReference.displayText` renders, including its fallback: `chapter: 0`
+ * is the model's "couldn't be structured" sentinel and such a reference shows its raw text.
+ */
+function verseText(verse) {
+  if (!verse.chapter) return verse.rawText || verse.book;
+  if (verse.verseStart == null) return `${verse.book} ${verse.chapter}`;
+  if (verse.verseEnd != null && verse.verseEnd !== verse.verseStart) {
+    return `${verse.book} ${verse.chapter}:${verse.verseStart}–${verse.verseEnd}`;
+  }
+  return `${verse.book} ${verse.chapter}:${verse.verseStart}`;
+}
+
+/* --- media -------------------------------------------------------------- */
+
+/**
+ * What a blob actually is, sniffed from its first bytes rather than assumed from the attachment's
+ * `kind`. A photo exported from an iPhone is as likely to be HEIC as JPEG, and HEIC is a format
+ * most browsers can't display — so it's better to say so and offer the file than to render a
+ * broken image.
+ */
+function sniff(bytes) {
+  const b = bytes;
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { type: "image/jpeg", viewable: true };
+  if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return { type: "image/png", viewable: true };
+  if (b.length > 12 && String.fromCharCode(b[4], b[5], b[6], b[7]) === "ftyp") {
+    const brand = String.fromCharCode(b[8], b[9], b[10], b[11]);
+    if (brand.startsWith("heic") || brand.startsWith("heix") || brand.startsWith("mif1")) {
+      return { type: "image/heic", viewable: false, note: "HEIC — most browsers can't preview this" };
+    }
+    if (brand.startsWith("qt")) return { type: "video/quicktime", viewable: true, video: true };
+    if (brand === "M4A ") return { type: "audio/mp4", viewable: true, audio: true };
+    return { type: "video/mp4", viewable: true, video: true };
+  }
+  return { type: "application/octet-stream", viewable: false };
+}
+
+/* ===========================================================================
+   Loading
+   =========================================================================== */
+
+async function openFile(file) {
+  let bytes = new Uint8Array(await file.arrayBuffer());
+
+  if (HSPFormat.isEncrypted(bytes)) {
+    const passphrase = await askPassphrase();
+    if (passphrase === null) return;
+    try {
+      bytes = await HSPFormat.decryptArchive(bytes, passphrase);
+    } catch (error) {
+      showPassphraseError(error.message);
+      return openFile(file);
+    }
+    state.arrivedEncrypted = true;
+  } else {
+    state.arrivedEncrypted = false;
+  }
+
+  const { manifest, blobs } = HSPFormat.readContainer(bytes);
+
+  state.fileName = file.name;
+  state.manifest = manifest;
+  state.pristine = JSON.parse(JSON.stringify(manifest));
+  state.blobs = blobs;
+  state.view = "promptings";
+  state.query = "";
+  state.open = null;
+  state.edited = new Set();
+  state.created = new Set();
+  state.renamedTags = new Set();
+  state.createdTags = new Set();
+
+  $("#welcome").hidden = true;
+  $("#shell").hidden = false;
+  render();
+}
+
+function closeFile() {
+  if (hasChanges() && !confirm("Close without exporting? The changes you have made here will be lost.")) return;
+  revokeURLs();
+  state.manifest = null;
+  state.blobs = new Map();
+  $("#shell").hidden = true;
+  $("#welcome").hidden = false;
+  $("#file").value = "";
+}
+
+/* --- the passphrase dialog, as a promise so `openFile` reads top to bottom --- */
+
+let passphraseResolve = null;
+
+function askPassphrase() {
+  const dialog = $("#passphrase-dialog");
+  $("#passphrase-input").value = "";
+  dialog.showModal();
+  $("#passphrase-input").focus();
+  return new Promise((resolve) => { passphraseResolve = resolve; });
+}
+
+function showPassphraseError(message) { $("#passphrase-error").textContent = message; }
+
+/* ===========================================================================
+   Changes
+   =========================================================================== */
+
+function hasChanges() {
+  return state.edited.size || state.created.size || state.renamedTags.size || state.createdTags.size;
+}
+
+/**
+ * Bumps `updatedAt` so a merge restore sees this record as newer than the copy on the phone.
+ *
+ * This is the one line that makes an edit here land at all: `.merge` compares `updatedAt` and
+ * skips anything no newer than what's already there, so a field changed without this is a field
+ * that silently does nothing.
+ */
+function markEdited(record) {
+  record.updatedAt = HSPFormat.swiftISO(now());
+  if (!state.created.has(record.id)) state.edited.add(record.id);
+  renderRail();
+
+  // The "edited" badge is inserted rather than re-rendered into place. Rebuilding the list here
+  // would destroy the textarea being typed into and take the cursor with it — which is exactly
+  // what happened on the first keystroke of every note before this.
+  const meta = document.querySelector(`[data-entry="${record.id}"] .entry-meta`);
+  if (meta && !meta.querySelector(".edited-mark")) {
+    const badge = document.createElement("span");
+    badge.className = "edited-mark";
+    badge.textContent = state.created.has(record.id) ? "new" : "edited";
+    meta.append(badge);
+  }
+}
+
+function revert(record, collection) {
+  const original = (state.pristine[collection] ?? []).find((r) => r.id === record.id);
+  if (!original) return;
+  for (const key of Object.keys(record)) delete record[key];
+  Object.assign(record, JSON.parse(JSON.stringify(original)));
+  state.edited.delete(record.id);
+  render();
+  toast("Reverted to what the backup said.");
+}
+
+/* ===========================================================================
+   Rendering
+
+   Two entry points on purpose. `render` rebuilds the whole view including the
+   search field; `renderList` rebuilds only the list below it. Typing in search
+   has to use the second, or the field it is typing into is destroyed on every
+   keystroke and focus goes with it.
+   =========================================================================== */
+
+const VIEWS = [
+  { key: "promptings", label: "Promptings", count: () => promptings().length },
+  { key: "stories", label: "God Stories", count: () => stories().length },
+  { key: "tags", label: "Tags", count: () => tags().length },
+  { key: "recordings", label: "Recordings", count: () => (state.manifest?.mediaFiles ?? []).length },
+];
+
+function renderRail() {
+  $("#file-name").textContent = state.fileName ?? "";
+  const exported = state.manifest?.exportedAt;
+  $("#file-meta").innerHTML = [
+    exported ? `Exported ${esc(readableMoment(exported))}` : "",
+    state.manifest?.appVersion ? `App version ${esc(state.manifest.appVersion)}` : "",
+    state.arrivedEncrypted ? '<span class="locked">✣ Opened from an encrypted file</span>' : "",
+  ].filter(Boolean).join("<br>");
+
+  $("#nav").innerHTML = VIEWS.map((view) => `
+    <li>
+      <button data-view="${view.key}" aria-current="${state.view === view.key}">
+        <span>${esc(view.label)}</span>
+        <span class="count">${view.count()}</span>
+      </button>
+    </li>`).join("");
+
+  const lines = [];
+  if (state.created.size) lines.push(`<b>${state.created.size}</b> written here`);
+  if (state.edited.size) lines.push(`<b>${state.edited.size}</b> edited`);
+  if (state.createdTags.size) lines.push(`<b>${state.createdTags.size}</b> new ${state.createdTags.size === 1 ? "tag" : "tags"}`);
+  if (state.renamedTags.size) lines.push(`<b>${state.renamedTags.size}</b> ${state.renamedTags.size === 1 ? "tag" : "tags"} renamed`);
+  $("#changes").innerHTML = lines.length
+    ? lines.join("<br>")
+    : '<span style="color:var(--ink-faint)">No changes yet.</span>';
+}
+
+function render() {
+  renderRail();
+  revokeURLs();
+
+  const header = {
+    promptings: {
+      title: "Promptings",
+      blurb: "Everything you have captured, newest first. Open one to edit its note, status, date and tags.",
+    },
+    stories: {
+      title: "God Stories",
+      blurb: `Short accounts of what God has done — up to ${STORY_MAX_LENGTH} characters each, the same cap the app keeps.`,
+    },
+    tags: {
+      title: "Tags",
+      blurb: "Rename a tag here and every prompting filed under it follows. Renaming is the one tag change that lands without the prompting itself being edited.",
+    },
+    recordings: {
+      title: "Recordings",
+      blurb: "The audio and photo bytes travelling inside this file. Read-only — recordings are edited in the app, but you can play and save them here.",
+    },
+  }[state.view];
+
+  const searchable = state.view === "promptings" || state.view === "stories";
+  const placeholder = state.view === "stories" ? "Search stories…" : "Search notes, verses, tags…";
+  const creatable = state.view === "promptings" ? "prompting" : state.view === "stories" ? "story" : null;
+
+  $("#main").innerHTML = `
+    <div class="head">
+      <h2>${esc(header.title)}</h2>
+      <p>${esc(header.blurb)}</p>
+    </div>
+    ${state.view === "promptings" ? scopeNotice() : ""}
+    ${searchable || creatable ? `
+      <div class="toolbar">
+        ${searchable ? `<input type="search" id="search" placeholder="${esc(placeholder)}" value="${esc(state.query)}" aria-label="Search">` : ""}
+        ${creatable ? `<button class="btn" data-act="new-${creatable}">Write a ${creatable === "prompting" ? "prompting" : "story"}</button>` : ""}
+      </div>` : ""}
+    <div id="list"></div>`;
+
+  renderList();
+}
+
+function scopeNotice() {
+  return `
+    <div class="notice">
+      <strong>What comes back to your phone.</strong> Notes, transcripts, status, dates and tags
+      return when you pick <strong>Add and Apply Edits</strong> on the restore. Verses, photos and
+      recordings travel in this file untouched and are shown here read-only — they are edited in
+      the app, which is the only place that can clean up the files behind them.
+    </div>`;
+}
+
+function renderList() {
+  const list = $("#list");
+  if (!list) return;
+  revokeURLs();
+  const builders = {
+    promptings: promptingList,
+    stories: storyList,
+    tags: tagTable,
+    recordings: recordingTable,
+  };
+  list.innerHTML = builders[state.view]();
+}
+
+/* --- promptings --------------------------------------------------------- */
+
+function matchesQuery(prompting) {
+  const q = state.query.trim().toLowerCase();
+  if (!q) return true;
+  const byID = tagsByID();
+  const haystack = [
+    prompting.textNote,
+    prompting.transcript,
+    prompting.fulfilledNote,
+    prompting.status,
+    ...(prompting.verses ?? []).map(verseText),
+    ...(prompting.tagIDs ?? []).map((id) => byID.get(id)?.name),
+  ].filter(Boolean).join(" ").toLowerCase();
+  return haystack.includes(q);
+}
+
+/** Newest first, with the same tie-breaks as `Prompting.newestFirst` so the order is total. */
+function newestFirst(a, b) {
+  if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+  if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
+  return a.id < b.id ? -1 : 1;
+}
+
+function promptingList() {
+  const rows = promptings().filter(matchesQuery).sort(newestFirst);
+  if (!rows.length) {
+    return `<p class="empty-state">${state.query ? "Nothing matches that." : "This backup holds no promptings."}</p>`;
+  }
+  return `<div class="entries">${rows.map(promptingEntry).join("")}</div>`;
+}
+
+function promptingEntry(prompting) {
+  const open = state.open === prompting.id;
+  const byID = tagsByID();
+  const chips = (prompting.tagIDs ?? []).map((id) => byID.get(id)).filter(Boolean);
+  const verses = prompting.verses ?? [];
+  const attachments = prompting.attachments ?? [];
+  const noteEmpty = !prompting.textNote?.trim();
+
+  const tail = [
+    verses.length ? `<span>${verses.map((v) => `<span class="verse">${esc(verseText(v))}</span>`).join("")}</span>` : "",
+    chips.length ? `<span class="chips">${chips.map((t) => `<span class="chip">${esc(t.name)}</span>`).join("")}</span>` : "",
+    attachments.length ? `<span class="aside">${esc(attachmentSummary(attachments))}</span>` : "",
+    prompting.transcript ? '<span class="aside">transcript</span>' : "",
+  ].filter(Boolean).join("");
+
+  return `
+    <article class="entry ${open ? "entry-open" : ""}" data-entry="${esc(prompting.id)}">
+      <button class="entry-head" data-act="toggle" data-id="${esc(prompting.id)}" aria-expanded="${open}">
+        <span class="entry-meta">
+          <time>${esc(readableMoment(prompting.date))}</time>
+          <span class="status status-${esc(prompting.status)}">${esc(prompting.status)}</span>
+          ${state.created.has(prompting.id) ? '<span class="edited-mark">new</span>' : ""}
+          ${state.edited.has(prompting.id) ? '<span class="edited-mark">edited</span>' : ""}
+        </span>
+        <span class="note ${noteEmpty ? "empty" : ""}">${esc(noteEmpty ? "(no note)" : prompting.textNote)}</span>
+        ${tail ? `<span class="entry-tail">${tail}</span>` : ""}
+      </button>
+      ${open ? promptingEditor(prompting) : ""}
+    </article>`;
+}
+
+function attachmentSummary(attachments) {
+  const counts = attachments.reduce((acc, a) => ({ ...acc, [a.kind]: (acc[a.kind] ?? 0) + 1 }), {});
+  const names = { audioRecording: "recording", photo: "photo", video: "video" };
+  return Object.entries(counts).map(([kind, n]) => plural(n, names[kind] ?? kind)).join(" · ");
+}
+
+function promptingEditor(prompting) {
+  return `
+    <div class="editor">
+      <div class="row">
+        <div>
+          <label class="eyebrow" for="date-${esc(prompting.id)}">When</label>
+          <input type="datetime-local" id="date-${esc(prompting.id)}" data-field="date" data-id="${esc(prompting.id)}" value="${esc(toLocalMoment(prompting.date))}">
+        </div>
+        <div>
+          <span class="eyebrow">Status</span>
+          <div class="segmented" role="radiogroup" aria-label="Status">
+            ${STATUSES.map((status) => `
+              <label>
+                <input type="radio" name="status-${esc(prompting.id)}" value="${status}" data-field="status" data-id="${esc(prompting.id)}" ${prompting.status === status ? "checked" : ""}>
+                <span>${status}</span>
+              </label>`).join("")}
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="eyebrow" for="note-${esc(prompting.id)}">Note</label>
+        <textarea class="note-input" id="note-${esc(prompting.id)}" data-field="textNote" data-id="${esc(prompting.id)}" rows="4">${esc(prompting.textNote ?? "")}</textarea>
+      </div>
+
+      ${prompting.status === "fulfilled" ? `
+        <div class="row">
+          <div>
+            <label class="eyebrow" for="fnote-${esc(prompting.id)}">How it was fulfilled</label>
+            <input type="text" id="fnote-${esc(prompting.id)}" data-field="fulfilledNote" data-id="${esc(prompting.id)}" value="${esc(prompting.fulfilledNote ?? "")}">
+          </div>
+          <div>
+            <label class="eyebrow" for="fdate-${esc(prompting.id)}">Fulfilled on</label>
+            <input type="datetime-local" id="fdate-${esc(prompting.id)}" data-field="fulfilledDate" data-id="${esc(prompting.id)}" value="${prompting.fulfilledDate ? esc(toLocalMoment(prompting.fulfilledDate)) : ""}">
+          </div>
+        </div>` : ""}
+
+      <div>
+        <span class="eyebrow">Tags</span>
+        <div data-chips="${esc(prompting.id)}">${tagChips(prompting)}</div>
+      </div>
+
+      ${prompting.transcript != null ? `
+        <div>
+          <label class="eyebrow" for="transcript-${esc(prompting.id)}">Transcript</label>
+          <textarea id="transcript-${esc(prompting.id)}" data-field="transcript" data-id="${esc(prompting.id)}" rows="3">${esc(prompting.transcript)}</textarea>
+        </div>` : ""}
+
+      ${readOnlySection(prompting)}
+
+      <div class="editor-foot">
+        <button class="btn" data-act="toggle" data-id="${esc(prompting.id)}">Done</button>
+        <span class="spacer"></span>
+        ${state.edited.has(prompting.id) ? `<button class="btn btn-quiet" data-act="revert" data-id="${esc(prompting.id)}" data-collection="promptings">Revert this entry</button>` : ""}
+      </div>
+    </div>`;
+}
+
+function tagChips(prompting) {
+  const byID = tagsByID();
+  const chosen = prompting.tagIDs ?? [];
+  const available = tags().filter((t) => !chosen.includes(t.id)).sort((a, b) => a.name.localeCompare(b.name));
+
+  return `
+    <div class="chips" style="margin-bottom:.6rem">
+      ${chosen.map((id) => {
+        const tag = byID.get(id);
+        if (!tag) return "";
+        return `<span class="chip">${esc(tag.name)}<button data-act="untag" data-id="${esc(prompting.id)}" data-tag="${esc(id)}" aria-label="Remove ${esc(tag.name)}">×</button></span>`;
+      }).join("") || '<span class="aside">No tags</span>'}
+    </div>
+    <div class="media-row">
+      ${available.length ? `
+        <select data-act="tag" data-id="${esc(prompting.id)}" style="max-width:14rem" aria-label="Add an existing tag">
+          <option value="">Add an existing tag…</option>
+          ${available.map((t) => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join("")}
+        </select>` : ""}
+      <button class="btn btn-quiet" data-act="new-tag" data-id="${esc(prompting.id)}">New tag</button>
+    </div>`;
+}
+
+/**
+ * Verses and attachments, shown and not editable — with the reason in place, because a read-only
+ * field with no explanation reads as an unfinished feature rather than a deliberate boundary.
+ */
+function readOnlySection(prompting) {
+  const verses = prompting.verses ?? [];
+  const attachments = prompting.attachments ?? [];
+  if (!verses.length && !attachments.length) return "";
+
+  return `
+    <div class="readonly">
+      <span class="eyebrow">Carried through, not editable here</span>
+      ${verses.length ? `<div>${verses.map((v) => `<span class="verse">${esc(verseText(v))}</span>`).join("")}</div>` : ""}
+      ${attachments.map((a) => attachmentRow(a)).join("")}
+      <p class="why">Verses and attachments are owned rows with files behind them, so the app is the only place that can change them safely. They travel in this file exactly as they are.</p>
+    </div>`;
+}
+
+function attachmentRow(attachment) {
+  const duration = readableDuration(attachment.duration);
+  const embedded = attachment.embeddedFilename ? state.blobs.get(attachment.embeddedFilename) : null;
+  const audio = attachment.localFilename ? state.blobs.get(attachment.localFilename) : null;
+
+  if (audio) {
+    return `
+      <div class="media-row">
+        <span class="aside">${esc(attachment.localFilename)}</span>
+        ${duration ? `<span class="aside">${esc(duration)}</span>` : ""}
+        <audio controls src="${blobURL(audio, "audio/mp4")}"></audio>
+      </div>`;
+  }
+  if (embedded) {
+    const kind = sniff(embedded);
+    if (kind.viewable && !kind.video) {
+      return `<div class="media-row"><img src="${blobURL(embedded, kind.type)}" alt=""><span class="aside">${esc(attachment.kind)}</span></div>`;
+    }
+    if (kind.video) {
+      return `<div class="media-row"><video controls style="max-height:9rem" src="${blobURL(embedded, kind.type)}"></video></div>`;
+    }
+    return `<div class="media-row"><span class="aside">${esc(attachment.kind)} · ${esc(kind.note ?? kind.type)}</span></div>`;
+  }
+  if (attachment.localFilename) {
+    return `<div class="media-row"><span class="aside">${esc(attachment.localFilename)}</span><span class="flag flag-missing">file not in this backup</span></div>`;
+  }
+  return `
+    <div class="media-row">
+      <span class="aside">${esc(attachment.kind)}</span>
+      <span class="aside">in your Photos library — this backup holds only the reference</span>
+    </div>`;
+}
+
+/* --- stories ------------------------------------------------------------ */
+
+function storyMatches(story) {
+  const q = state.query.trim().toLowerCase();
+  return !q || (story.text ?? "").toLowerCase().includes(q);
+}
+
+function storyList() {
+  const rows = stories().filter(storyMatches).sort(newestFirst);
+  if (!rows.length) {
+    return `<p class="empty-state">${state.query ? "Nothing matches that." : "This backup holds no God stories."}</p>`;
+  }
+  return `<div class="entries">${rows.map(storyEntry).join("")}</div>`;
+}
+
+function storyEntry(story) {
+  const open = state.open === story.id;
+  const empty = !story.text?.trim();
+  const photo = story.embeddedFilename ? state.blobs.get(story.embeddedFilename) : null;
+
+  return `
+    <article class="entry ${open ? "entry-open" : ""}" data-entry="${esc(story.id)}">
+      <button class="entry-head" data-act="toggle" data-id="${esc(story.id)}" aria-expanded="${open}">
+        <span class="entry-meta">
+          <time>${esc(readableDay(story.date))}</time>
+          ${state.created.has(story.id) ? '<span class="edited-mark">new</span>' : ""}
+          ${state.edited.has(story.id) ? '<span class="edited-mark">edited</span>' : ""}
+        </span>
+        <span class="note ${empty ? "empty" : ""}">${esc(empty ? "(no story yet)" : story.text)}</span>
+        ${story.photoAssetIdentifier ? '<span class="entry-tail"><span class="aside">1 photo</span></span>' : ""}
+      </button>
+      ${open ? storyEditor(story, photo) : ""}
+    </article>`;
+}
+
+function storyEditor(story, photo) {
+  const length = [...(story.text ?? "")].length;
+  return `
+    <div class="editor">
+      <div class="row">
+        <div>
+          <label class="eyebrow" for="sdate-${esc(story.id)}">The day it happened</label>
+          <input type="date" id="sdate-${esc(story.id)}" data-field="storyDate" data-id="${esc(story.id)}" value="${esc(toLocalDay(story.date))}">
+        </div>
+      </div>
+
+      <div>
+        <label class="eyebrow" for="stext-${esc(story.id)}">The story</label>
+        <textarea class="note-input" id="stext-${esc(story.id)}" data-field="storyText" data-id="${esc(story.id)}" rows="3" maxlength="${STORY_MAX_LENGTH}">${esc(story.text ?? "")}</textarea>
+        <div class="counter ${length >= STORY_MAX_LENGTH ? "full" : ""}" data-counter="${esc(story.id)}">${length} / ${STORY_MAX_LENGTH}</div>
+      </div>
+
+      ${story.photoAssetIdentifier ? `
+        <div class="readonly">
+          <span class="eyebrow">Carried through, not editable here</span>
+          ${photo ? photoPreview(photo) : '<p class="why">The photo lives in your Photos library; this backup holds only the reference to it. It reappears in the app on a phone whose library still has it.</p>'}
+        </div>` : ""}
+
+      <div class="editor-foot">
+        <button class="btn" data-act="toggle" data-id="${esc(story.id)}">Done</button>
+        <span class="spacer"></span>
+        ${state.edited.has(story.id) ? `<button class="btn btn-quiet" data-act="revert" data-id="${esc(story.id)}" data-collection="stories">Revert this story</button>` : ""}
+      </div>
+    </div>`;
+}
+
+function photoPreview(bytes) {
+  const kind = sniff(bytes);
+  return kind.viewable && !kind.video
+    ? `<div class="media-row"><img src="${blobURL(bytes, kind.type)}" alt=""></div>`
+    : `<p class="why">${esc(kind.note ?? "This backup carries the photo's bytes, but not in a format this browser can show.")}</p>`;
+}
+
+/* --- tags --------------------------------------------------------------- */
+
+/**
+ * The same rule as `Tag.renameOutcome`, which the app shares between its two rename screens for
+ * exactly this reason: a third opinion about what a legal name is would mean the page accepts a
+ * rename the phone then silently declines. Case-insensitive, and identity by id so a tag can
+ * change its own capitalisation without colliding with itself.
+ */
+function renameOutcome(tag, proposed) {
+  const trimmed = proposed.trim();
+  if (!trimmed) return { kind: "empty" };
+  if (trimmed === tag.name) return { kind: "unchanged" };
+  const clash = tags().find((t) => t.id !== tag.id && t.name.toLowerCase() === trimmed.toLowerCase());
+  if (clash) return { kind: "duplicate", existing: clash.name };
+  return { kind: "rename", to: trimmed };
+}
+
+/**
+ * Records the name the phone knows this tag by, as `renamedFrom`, which is what a merge needs to
+ * apply the rename at all. A tag has no `updatedAt`, so the restore applies a rename only while the
+ * tag on the phone still has this name — otherwise an old file would undo a rename made on the
+ * phone since. Taken from the file as opened, and from *its* `renamedFrom` if it already carries
+ * one, since a file exported from here and reopened describes the phone's name, not its own.
+ * Renaming back to that name drops the field: there is nothing left to apply.
+ */
+function markRenamed(tag) {
+  const original = state.pristine.tags.find((t) => t.id === tag.id);
+  const phoneName = original?.renamedFrom ?? original?.name;
+  if (phoneName === undefined || tag.name === phoneName) {
+    delete tag.renamedFrom;
+    state.renamedTags.delete(tag.id);
+  } else {
+    tag.renamedFrom = phoneName;
+    state.renamedTags.add(tag.id);
+  }
+}
+
+function tagUsage() {
+  const counts = new Map(tags().map((t) => [t.id, 0]));
+  for (const prompting of promptings()) {
+    for (const id of prompting.tagIDs ?? []) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function tagTable() {
+  const counts = tagUsage();
+  const rows = tags().slice().sort((a, b) => a.name.localeCompare(b.name));
+  if (!rows.length) return '<p class="empty-state">This backup holds no tags.</p>';
+
+  return `
+    <table>
+      <thead><tr><th style="width:58%">Name</th><th style="width:16%">Promptings</th><th style="width:26%"></th></tr></thead>
+      <tbody>
+        ${rows.map((tag) => `
+          <tr>
+            <td><input type="text" data-field="tagName" data-id="${esc(tag.id)}" value="${esc(tag.name)}" aria-label="Name of tag ${esc(tag.name)}"></td>
+            <td class="num">${counts.get(tag.id) ?? 0}</td>
+            <td>${state.renamedTags.has(tag.id) ? '<span class="flag flag-orphan">renamed</span>' : state.createdTags.has(tag.id) ? '<span class="flag flag-orphan">new</span>' : ""}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>
+    <p class="why" style="margin-top:1.25rem;color:var(--ink-faint);font-size:.8125rem;max-width:54ch">
+      A tag used by nothing is still carried in the file, and still restores — the app lists it on the
+      Related tab. Deleting one is a job for the app; this page can only add and rename.
+    </p>`;
+}
+
+/* --- recordings --------------------------------------------------------- */
+
+/**
+ * Both directions of mismatch from one pass, the way `RecordingInventory` does it on the device:
+ * a blob nothing references is an *orphan*, and a row naming a blob that isn't here is *missing*.
+ *
+ * They are kept apart because they mean opposite things. An orphan still has its bytes and can be
+ * saved out of this page. A missing file's bytes are simply gone — the row is listed as a
+ * diagnosis, and the one thing that can repair it is restoring a backup that still has them,
+ * which is a thing `.merge` and `.additive` both do.
+ */
+function recordingInventory() {
+  const files = state.manifest?.mediaFiles ?? [];
+  const claims = new Map();
+  const missing = [];
+
+  const claim = (filename, by) => {
+    if (!filename) return;
+    if (!claims.has(filename)) claims.set(filename, []);
+    claims.get(filename).push(by);
+  };
+
+  const present = new Set(files.map((f) => f.filename));
+
+  for (const prompting of promptings()) {
+    const label = (prompting.textNote || "(no note)").slice(0, 48);
+    for (const attachment of prompting.attachments ?? []) {
+      claim(attachment.localFilename, label);
+      claim(attachment.embeddedFilename, label);
+      if (attachment.localFilename && !present.has(attachment.localFilename)) {
+        missing.push({ filename: attachment.localFilename, by: label });
+      }
+    }
+  }
+  for (const story of stories()) {
+    claim(story.embeddedFilename, (story.text || "(no story)").slice(0, 48));
+  }
+
+  return { files, claims, missing };
+}
+
+function recordingTable() {
+  const { files, claims, missing } = recordingInventory();
+  if (!files.length && !missing.length) {
+    return '<p class="empty-state">This backup carries no media bytes — only references into your Photos library.</p>';
+  }
+
+  const total = files.reduce((sum, f) => sum + f.byteCount, 0);
+
+  const rows = files.slice().sort((a, b) => b.byteCount - a.byteCount).map((file) => {
+    const bytes = state.blobs.get(file.filename);
+    const by = claims.get(file.filename) ?? [];
+    const kind = bytes ? sniff(bytes) : { type: "application/octet-stream" };
+    return `
+      <tr>
+        <td class="wrap"><span class="aside">${esc(file.filename)}</span></td>
+        <td class="num">${esc(readableBytes(file.byteCount))}</td>
+        <td class="clip" title="${by.length ? esc(by[0]) : ""}">${by.length ? esc(by[0]) : '<span class="flag flag-orphan">referenced by nothing</span>'}</td>
+        <td class="actions">
+          <div class="media-row">
+            ${bytes && (kind.audio || file.filename.endsWith(".m4a")) ? `<audio controls src="${blobURL(bytes, "audio/mp4")}"></audio>` : ""}
+            ${bytes ? `<button class="btn btn-quiet" data-act="save-blob" data-name="${esc(file.filename)}">Save</button>` : ""}
+          </div>
+        </td>
+      </tr>`;
+  }).join("");
+
+  const missingRows = missing.map((item) => `
+    <tr>
+      <td class="wrap"><span class="aside">${esc(item.filename)}</span></td>
+      <td class="num">—</td>
+      <td class="clip" title="${esc(item.by)}">${esc(item.by)}</td>
+      <td class="actions"><span class="flag flag-missing">bytes are not in this file</span></td>
+    </tr>`).join("");
+
+  return `
+    <table>
+      <thead><tr><th style="width:28%">File</th><th style="width:10%">Size</th><th style="width:26%">Claimed by</th><th style="width:36%"></th></tr></thead>
+      <tbody>${rows}${missingRows}</tbody>
+    </table>
+    <p style="margin-top:1.25rem;color:var(--ink-faint);font-size:.8125rem;max-width:58ch">
+      ${esc(plural(files.length, "file"))}, ${esc(readableBytes(total))} in total.
+      A file <em>referenced by nothing</em> is in no other backup and reachable from nowhere else —
+      saving it here is the only way to get it out. One listed as <em>not in this file</em> had
+      already gone missing when this backup was taken.
+    </p>`;
+}
+
+/* ===========================================================================
+   Editing — one delegated listener per kind of event, dispatching on data-*
+   =========================================================================== */
+
+const findPrompting = (id) => promptings().find((p) => p.id === id);
+const findStory = (id) => stories().find((s) => s.id === id);
+
+/** Mirrors the `mark…` methods on `Prompting`: moving off fulfilled clears the fulfilment. */
+function setStatus(prompting, status) {
+  prompting.status = status;
+  if (status === "active" || status === "future") {
+    delete prompting.fulfilledDate;
+    delete prompting.fulfilledNote;
+  } else if (status === "fulfilled" && !prompting.fulfilledDate) {
+    prompting.fulfilledDate = HSPFormat.swiftISO(now());
+  }
+}
+
+$("#main").addEventListener("input", (event) => {
+  const field = event.target.dataset.field;
+  if (!field) return;    // the search box and the export dialog's inputs carry none
+  const id = event.target.dataset.id;
+  const value = event.target.value;
+
+  if (field === "tagName") {
+    const tag = tags().find((t) => t.id === id);
+    const outcome = renameOutcome(tag, value);
+    if (outcome.kind === "rename") {
+      tag.name = outcome.to;
+      if (!state.createdTags.has(tag.id)) markRenamed(tag);
+      renderRail();
+    }
+    // `empty`, `unchanged` and `duplicate` all leave the stored name alone. The field keeps what
+    // was typed so the person can carry on editing; `blur` is where it reports or snaps back.
+    return;
+  }
+
+  if (field === "storyText" || field === "storyDate") {
+    const story = findStory(id);
+    if (!story) return;
+    if (field === "storyText") {
+      // The cap is applied here rather than left to `maxlength` alone, because `maxlength` counts
+      // UTF-16 units: an emoji would spend two of the 255 a person can see. `Array.from` counts
+      // the characters `GodStory.clamped` counts.
+      const characters = [...value];
+      story.text = characters.length > STORY_MAX_LENGTH
+        ? characters.slice(0, STORY_MAX_LENGTH).join("")
+        : value;
+      if (story.text !== value) event.target.value = story.text;
+      const counter = document.querySelector(`[data-counter="${id}"]`);
+      if (counter) {
+        const length = [...story.text].length;
+        counter.textContent = `${length} / ${STORY_MAX_LENGTH}`;
+        counter.classList.toggle("full", length >= STORY_MAX_LENGTH);
+      }
+    } else {
+      if (!value) return;
+      story.date = HSPFormat.swiftISO(fromLocalDay(value));
+    }
+    markEdited(story);
+    return;
+  }
+
+  const prompting = findPrompting(id);
+  if (!prompting) return;
+
+  if (field === "status") setStatus(prompting, value);
+  else if (field === "date" || field === "fulfilledDate") {
+    if (!value) {
+      if (field === "fulfilledDate") delete prompting.fulfilledDate;
+      else return;
+    } else {
+      prompting[field] = HSPFormat.swiftISO(new Date(value));
+    }
+  } else if (field === "fulfilledNote") {
+    // Absent rather than empty, because that is what an unfulfilled prompting looks like coming
+    // out of the app — and `canonicalJSON` omits it either way, so storing "" would be a lie that
+    // the file couldn't even carry.
+    if (value.trim()) prompting.fulfilledNote = value;
+    else delete prompting.fulfilledNote;
+  } else if (EDITABLE_PROMPTING_FIELDS.includes(field)) {
+    prompting[field] = value;
+  }
+
+  markEdited(prompting);
+  if (field === "status") renderList();    // the fulfilment fields appear and disappear with it
+});
+
+$("#main").addEventListener("input", (event) => {
+  if (event.target.id !== "search") return;
+  state.query = event.target.value;
+  renderList();
+});
+
+/** A rejected rename reports itself when the field is left, not on every keystroke. */
+$("#main").addEventListener("blur", (event) => {
+  if (event.target.dataset.field !== "tagName") return;
+  const tag = tags().find((t) => t.id === event.target.dataset.id);
+  if (!tag) return;
+  const outcome = renameOutcome(tag, event.target.value);
+  if (outcome.kind === "duplicate") toast(`There is already a tag called “${outcome.existing}”.`);
+  else if (outcome.kind === "empty") toast("A tag needs a name.");
+  if (outcome.kind !== "rename") event.target.value = tag.name;
+}, true);
+
+$("#main").addEventListener("change", (event) => {
+  if (event.target.dataset.act !== "tag") return;
+  const prompting = findPrompting(event.target.dataset.id);
+  const tagID = event.target.value;
+  if (!prompting || !tagID) return;
+  prompting.tagIDs = [...(prompting.tagIDs ?? []), tagID];
+  markEdited(prompting);
+  refreshChips(prompting);
+});
+
+$("#main").addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-act]");
+  if (!trigger) return;
+  const { act, id } = trigger.dataset;
+
+  if (act === "toggle") {
+    state.open = state.open === id ? null : id;
+    renderList();
+    return;
+  }
+
+  if (act === "revert") {
+    const collection = trigger.dataset.collection;
+    const record = collection === "stories" ? findStory(id) : findPrompting(id);
+    if (record) revert(record, collection);
+    return;
+  }
+
+  if (act === "untag") {
+    const prompting = findPrompting(id);
+    prompting.tagIDs = (prompting.tagIDs ?? []).filter((t) => t !== trigger.dataset.tag);
+    markEdited(prompting);
+    refreshChips(prompting);
+    return;
+  }
+
+  if (act === "new-tag") {
+    const name = prompt("Name for the new tag")?.trim();
+    if (!name) return;
+    // The same refusal `TagPickerView.createTag` makes: a name differing from an existing tag only
+    // in case is the same tag, and letting both exist would split the many-to-many on restore.
+    const existing = tags().find((t) => t.name.toLowerCase() === name.toLowerCase());
+    const prompting = findPrompting(id);
+    if (existing) {
+      if (!(prompting.tagIDs ?? []).includes(existing.id)) {
+        prompting.tagIDs = [...(prompting.tagIDs ?? []), existing.id];
+        markEdited(prompting);
+        refreshChips(prompting);
+      }
+      toast(`Using the tag “${existing.name}” that is already here.`);
+      return;
+    }
+    const tag = { id: crypto.randomUUID(), name };
+    state.manifest.tags.push(tag);
+    state.createdTags.add(tag.id);
+    prompting.tagIDs = [...(prompting.tagIDs ?? []), tag.id];
+    markEdited(prompting);
+    refreshChips(prompting);
+    return;
+  }
+
+  if (act === "new-prompting") { createPrompting(); return; }
+  if (act === "new-story") { createStory(); return; }
+
+  if (act === "save-blob") {
+    const name = trigger.dataset.name;
+    const bytes = state.blobs.get(name);
+    if (bytes) download(bytes, name, "application/octet-stream");
+    return;
+  }
+});
+
+/* Only the chips are rebuilt, not the whole list — a tag change shouldn't throw away the cursor
+   in the note someone is halfway through writing. */
+function refreshChips(prompting) {
+  const host = document.querySelector(`[data-chips="${prompting.id}"]`);
+  if (host) host.innerHTML = tagChips(prompting);
+}
+
+$("#nav").addEventListener("click", (event) => {
+  const view = event.target.closest("[data-view]")?.dataset.view;
+  if (!view) return;
+  state.view = view;
+  state.open = null;
+  state.query = "";
+  render();
+});
+
+/* --- writing something new ---------------------------------------------- */
+
+/**
+ * A record created here lands on the phone because `.merge` inserts what it doesn't have — the
+ * same path `.additive` uses. So this needs a real `id`, and nothing else special.
+ */
+function createPrompting() {
+  const stamp = HSPFormat.swiftISO(now());
+  const prompting = {
+    id: crypto.randomUUID(),
+    date: stamp, createdAt: stamp, updatedAt: stamp,
+    textNote: "", status: "active",
+    tagIDs: [], verses: [], attachments: [],
+  };
+  state.manifest.promptings.push(prompting);
+  state.created.add(prompting.id);
+  state.open = prompting.id;
+  state.query = "";
+  render();
+  document.getElementById(`note-${prompting.id}`)?.focus();
+}
+
+function createStory() {
+  const today = now();
+  const story = {
+    id: crypto.randomUUID(),
+    // A story's date is a day, so a new one starts at local midnight — what `GodStory.day` would
+    // have stored had it been written in the app.
+    date: HSPFormat.swiftISO(new Date(today.getFullYear(), today.getMonth(), today.getDate())),
+    createdAt: HSPFormat.swiftISO(today),
+    updatedAt: HSPFormat.swiftISO(today),
+    text: "",
+  };
+  if (!state.manifest.stories) state.manifest.stories = [];
+  state.manifest.stories.push(story);
+  state.created.add(story.id);
+  state.open = story.id;
+  state.query = "";
+  render();
+  document.getElementById(`stext-${story.id}`)?.focus();
+}
+
+/* ===========================================================================
+   Export
+   =========================================================================== */
+
+function download(bytes, filename, type) {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Revoked on a turn of the event loop rather than immediately: Safari cancels the download if
+  // the URL is released in the same tick as the click.
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function exportFilename(encrypted) {
+  const today = now();
+  const stamp = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  return `HolySpiritPrompts-${stamp}.${encrypted ? "hspromptsenc" : "hsprompts"}`;
+}
+
+function changeSummary() {
+  const parts = [];
+  if (state.created.size) parts.push(`${plural(state.created.size, "new record")}`);
+  if (state.edited.size) parts.push(`${plural(state.edited.size, "edited record")}`);
+  if (state.createdTags.size) parts.push(`${plural(state.createdTags.size, "new tag")}`);
+  if (state.renamedTags.size) parts.push(`${plural(state.renamedTags.size, "renamed tag")}`);
+  if (!parts.length) return "Nothing has been changed, so this will export the same library you opened.";
+  return `This file will carry ${parts.join(", ")}. On your phone, pick “Add and Apply Edits” for the edits to land — “Add to My Library” skips anything it already has.`;
+}
+
+async function performExport() {
+  const encrypt = $("#export-encrypt").checked;
+  const passphrase = $("#export-passphrase").value;
+
+  if (encrypt) {
+    if (!passphrase) { $("#export-error").textContent = "Enter a passphrase."; return; }
+    if (passphrase !== $("#export-passphrase-confirm").value) {
+      $("#export-error").textContent = "Those passphrases don't match.";
+      return;
+    }
+  }
+
+  // `exportedAt` is when this file was written, which is now. `appVersion` is left exactly as it
+  // arrived: it records which build of the app produced the library, and this page produced none
+  // of it.
+  state.manifest.exportedAt = HSPFormat.swiftISO(now());
+
+  try {
+    let bytes = HSPFormat.writeContainer(state.manifest, state.blobs);
+    if (encrypt) bytes = await HSPFormat.encryptArchive(bytes, passphrase);
+    download(bytes, exportFilename(encrypt), "application/octet-stream");
+    $("#export-dialog").close();
+    toast("Exported. Open it on your phone from Files, or through Settings › Restore.");
+  } catch (error) {
+    $("#export-error").textContent = error.message;
+  }
+}
+
+/* ===========================================================================
+   Wiring
+   =========================================================================== */
+
+$("#pick").addEventListener("click", () => $("#file").click());
+$("#file").addEventListener("change", (event) => {
+  const file = event.target.files?.[0];
+  if (file) handleOpen(file);
+});
+
+const drop = $("#drop");
+["dragenter", "dragover"].forEach((type) => drop.addEventListener(type, (event) => {
+  event.preventDefault();
+  drop.classList.add("over");
+}));
+["dragleave", "drop"].forEach((type) => drop.addEventListener(type, () => drop.classList.remove("over")));
+drop.addEventListener("drop", (event) => {
+  event.preventDefault();
+  const file = event.dataTransfer?.files?.[0];
+  if (file) handleOpen(file);
+});
+
+async function handleOpen(file) {
+  $("#passphrase-error").textContent = "";
+  try {
+    await openFile(file);
+  } catch (error) {
+    alert(error instanceof HSPFormat.BackupError ? error.message : `That file couldn't be read. ${error.message}`);
+  }
+}
+
+$("#passphrase-ok").addEventListener("click", () => {
+  const value = $("#passphrase-input").value;
+  $("#passphrase-dialog").close();
+  passphraseResolve?.(value);
+});
+$("#passphrase-cancel").addEventListener("click", () => {
+  $("#passphrase-dialog").close();
+  passphraseResolve?.(null);
+});
+$("#passphrase-input").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") { event.preventDefault(); $("#passphrase-ok").click(); }
+});
+
+$("#export").addEventListener("click", () => {
+  $("#export-summary").textContent = changeSummary();
+  $("#export-encrypt").checked = state.arrivedEncrypted;
+  $("#export-passphrase-field").hidden = !state.arrivedEncrypted;
+  $("#export-passphrase").value = "";
+  $("#export-passphrase-confirm").value = "";
+  $("#export-error").textContent = "";
+  $("#export-dialog").showModal();
+});
+$("#export-encrypt").addEventListener("change", (event) => {
+  $("#export-passphrase-field").hidden = !event.target.checked;
+});
+$("#export-cancel").addEventListener("click", () => $("#export-dialog").close());
+$("#export-go").addEventListener("click", performExport);
+$("#close").addEventListener("click", closeFile);
+
+window.addEventListener("beforeunload", (event) => {
+  if (!hasChanges()) return;
+  event.preventDefault();
+  event.returnValue = "";    // Safari raises the prompt off this, not off preventDefault alone
+});
+
+/*
+  Exposed for `Web/Tests/roundtrip.mjs`, which drives this page in a real browser rather than
+  re-implementing the codec in Node — one implementation, tested where it actually runs. The
+  boundary is the same one the file is organised around, so this publishes nothing that isn't
+  already a seam.
+*/
+window.HSP = {
+  format: HSPFormat,
+  state,
+  openBytes(bytes, name = "fixture.hsprompts") {
+    const { manifest, blobs } = HSPFormat.readContainer(bytes);
+    state.fileName = name;
+    state.manifest = manifest;
+    state.pristine = JSON.parse(JSON.stringify(manifest));
+    state.blobs = blobs;
+    state.edited = new Set();
+    state.created = new Set();
+    state.renamedTags = new Set();
+    state.createdTags = new Set();
+    state.open = null;
+    state.view = "promptings";
+    $("#welcome").hidden = true;
+    $("#shell").hidden = false;
+    render();
+    return manifest;
+  },
+  pinClock(milliseconds) { pinnedTime = milliseconds; },
+  exportBytes() {
+    state.manifest.exportedAt = HSPFormat.swiftISO(now());
+    return HSPFormat.writeContainer(state.manifest, state.blobs);
+  },
+  helpers: { markEdited, markRenamed, setStatus, renameOutcome, createPrompting, createStory, verseText, findPrompting, findStory },
+};
+</script>
+</body>
+</html>
